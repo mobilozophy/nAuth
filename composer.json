@@ -1,5 +1,5 @@
 {
-  "name": "webdevnick/nAuthJWT",
+  "name": "webdevnick/n-auth-jwt",
   "type": "library",
   "description": "Logging for PHP 5.3",
   "keywords": ["JWT","JSON Web Tokens","authentication"],
