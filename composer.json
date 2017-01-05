@@ -1,7 +1,7 @@
 {
   "name": "webdevnick/n-auth-jwt",
   "type": "library",
-  "description": "Logging for PHP 5.3",
+  "description": "Simple, but limited, JSON Web Token library for PHP.",
   "keywords": ["JWT","JSON Web Tokens","authentication"],
   "homepage": "https://github.com/theWebDevNick",
   "license": "MIT",
