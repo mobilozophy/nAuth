@@ -1,8 +1,8 @@
 <?php
-/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * class nAuthJWT
- * Represents an instance of a JSON Web Token (JWT)
- * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+/**
+ * Class nAuthJWT
+ */
 class nAuthJWT
 {
     public $payload = array("exp"=>null,"iat"=>null);
@@ -13,23 +13,23 @@ class nAuthJWT
     private $header =array("typ"=>"JWT","alg"=>"HS256");//default encryption
     private $eAlg=null;
     private $securityKey=null;
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-     * __construct
-     * nAuthJWT class constructor--creates a new instance of the nAuthJWT class
-     *
-     * PRE:$tokenString must be a JWT token or null. If $tokenString is null, then $expiration and $encryption must be
-     * provided. $expiration must be a string representing a duration from now in minutes (for example, "+30 Minutes".
-     * Encryption can be null or a string of 'HS256', 'HS384', or 'HS512'. $privateKey is user-specified and can't be null
-     * POST:Creates an instance of a the JSonWebToken class. If $tokenString was passed and failed to validate, then
-     * all content will be null, except for $isValid which will be set to false.
-     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-    public function __construct($tokenString,$expiration,$encryption, $privateKey)
+
+    /**
+     * nAuthJWT constructor.
+     * @param null $tokenString
+     * @param null $expiration
+     * @param null $encryption
+     * @param $privateKey
+     * @throws Exception
+     */
+    public function __construct($tokenString=null,$expiration=null,$encryption=null, $privateKey)
     {
         if ($privateKey!=null) {
+            $this->securityKey=$privateKey;
             if ($tokenString == null) {
-                $this->payload["iat"] = gmdate("Y/m/d h:i:s");
+                $this->payload["iat"] = gmdate("Y/m/d h:i:s A");
                 if (strtotime($expiration)) {
-                    $this->payload["exp"] = gmdate("Y/m/d h:i:s", strtotime($expiration));
+                    $this->payload["exp"] = gmdate("Y/m/d h:i:s A", strtotime($expiration));
                 } else {
                     throw new Exception("nAuth Exception: Invalid value provided for expiration.");
                 }
@@ -43,8 +43,8 @@ class nAuthJWT
             }//if tokenString==null
             else {//create an instance of this class from an existing JWT token string
                 if ($components = $this->validateToken($tokenString)) {//if this is a valid token, create an instance of this class
-                    $this->header = (array)json_decode(base64_decode($components[0]));
-                    $this->payload = (array)json_decode(base64_decode($components[1]));
+                    $this->header = (array)json_decode($this->base64url_decode($components[0]));
+                    $this->payload = (array)json_decode($this->base64url_decode($components[1]));
                 } else {
                     //don't create a token, instead invalidate it
                     $this->isValid = false;
@@ -56,13 +56,12 @@ class nAuthJWT
             throw new Exception("nAuth Exception: Private Key was not specified.");
         }
     }//constructor
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-     *(public) function pushPayload
-     * Adds and element to the JWT payload
-     * PRE: $key must be a string that isn't equal to 'iat' or 'exp', $value can be any datatype, including null
-     * POST:Creates a new element in the payload array with a key of $key and a value of $value. If $key already
-     * exists as a key in the payload array, then its value is overwritten with $value.
-     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+    /**
+     * @param $key string representing t
+     * @param $value
+     * @throws Exception
+     */
     public function pushPayload($key,$value)
     {
         if ($key=='iat' || $key =='exp')
@@ -73,38 +72,31 @@ class nAuthJWT
         {
             $this->payload[$key]=$value;
         }//else
-
     }//function pushPayload
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-     *public Function sign()
-     *Creates a signature element and encodes the JWT header, payload, and signature blocks
-     * PRE: isValid must be true
-     * POST: Creates and sets a base64 encoded signature saved as $eSignature. The header and payload are JSON and base64
-     * encoded and saved in $eHeader and $ePayload respectively.
-     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-   public function sign()
+
+    /**
+     * @throws Exception
+     */
+    public function sign()
     {
         if(($this->isValid))
         {
-            $this->eHeader = base64_encode(json_encode($this->header));
-            $this->ePayload = base64_encode(json_encode($this->payload));
+            $this->eHeader = $this->base64url_encode(json_encode($this->header));
+            $this->ePayload = $this->base64url_encode(json_encode($this->payload));
             $signature = $this->eHeader . "." . $this->ePayload;
-            $signature = hash_hmac($this->eAlg, $signature, $this->securityKey, true);
-            $this->eSignature = base64_encode($signature);
+            $this->eSignature  = hash_hmac($this->eAlg, $signature, $this->securityKey, false);
         }//if
         else
         {
-            throw new Exception("nAuth Exception: Cannot sign an invalid JWT. This JWT was created from a token string that did not pass the validation test.");
+            throw new Exception("nAuth Exception: Cannot sign an invalid JWT. This JWT was created from a token string that did not pass the validation keys.");
         }//else
     }//function sign()
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-     *public function getTokenString
-     *returns a JWT string from this instance of the nAuthJWT class
-     *
-     * PRE:eHeader, ePayload, and eSignature must be not null
-     * POST:A single, properly formatted, JWT string is returned.
-     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-   public function getTokenString()
+
+    /**
+     * @return string
+     * @throws Exception
+     */
+    public function getTokenString()
     {
         if ($this->eHeader!=null && $this->ePayload!=null && $this->eSignature!=null) {
             $jwt = $this->eHeader . "." . $this->ePayload . "." . $this->eSignature;
@@ -115,32 +107,27 @@ class nAuthJWT
             throw new Exception("nAuth Exception: Cannot return a token string for an unsigned token. Please call the sign() method before calling the getTokenString() method");
         }//else
     }//getTokenString()
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-     *public function refreshToken($expiration)
-     *changes the expiration time for the token
-     *
-     * PRE:$expiration must be a non-null string convertible via strtotime;
-     * POST:payload["exp"] is updated.
-    * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+    /**
+     * @param $expiration
+     * @throws Exception
+     */
     public function refreshToken($expiration)
     {
         if (strtotime($expiration))
         {
-            $this->payload["exp"] = gmdate("Y/m/d h:i:s", strtotime($expiration));
+            $this->payload["exp"] = gmdate("Y/m/d h:i:s A", strtotime($expiration));
         }
         else
         {
             throw new Exception("nAuth Exception: Invalid value provided for expiration.");
         }
     }
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-     *private function getAlgorithm($encryption)
-     *Returns a string representing the hashing algorithm to use in the php hash_hmac function
-     *
-     * PRE: $encryption is a string or null
-     * POST: Returns a string representation of the hashing algorithm to use, or false if $encryption is invalid. A null
-     * value will return a default of "sha256"
-     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+    /**
+     * @param $encryption
+     * @return bool|string
+     */
     private function getAlgorithm($encryption)
     {
         switch ($encryption) {
@@ -152,34 +139,41 @@ class nAuthJWT
                 return "sha384";
                 break;
             case "HS512":
-               return "sha512";
+                return "sha512";
                 break;
             default:
                 return false;
         }
     }
-    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-     *private function validateToken($token)
-     *checks the validity of an JWT token
-     *
-     * PRE: $token must be a string
-     * POST: Returns the components array of an exploded JWT string if $token is valid, else returns false
-     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+    /**
+     * @param $token
+     * @return array|bool
+     */
     private function validateToken($token)
     {
         $components = explode(".",$token);
         if (count($components)==3)
         {
             $signature = $components[0] . "." . $components[1];
-            $head =json_decode(base64_decode($components[0]));
+            $head =json_decode($this->base64url_decode($components[0]));
             $eAlg = $this->getAlgorithm($head->alg);
-            $signature =base64_encode(hash_hmac($eAlg, $signature, $this->securityKey, true));
+            $signature =hash_hmac($eAlg, $signature, $this->securityKey, false);
             if ($signature == $components[2])
             {
-                return $components;
+                //signature is good, now check expiration
+                if ($this->notExpired((array)json_decode($this->base64url_decode($components[1]))))
+                {
+                    return $components;
+                }
+                else
+                {
+                    return false;
+                }
             }
             else
             {
+                //signature no bueno
                 return false;
             }
         }//if
@@ -188,4 +182,45 @@ class nAuthJWT
             return false;
         }
     }//function validateToken
+
+    /**
+     * @param $data
+     * @return string
+     */
+    private function base64url_encode($data) {
+        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+    }
+
+    /**
+     * @param $data
+     * @return string
+     */
+    private function base64url_decode($data) {
+        return base64_decode(str_pad(strtr($data, '-_', '+/'), strlen($data) % 4, '=', STR_PAD_RIGHT));
+    }
+
+    /**
+     * @param $payload
+     * @return bool
+     */
+    private function notExpired($payload)
+    {
+        if (isset($payload["exp"])) {
+            $expiration = strtotime($payload["exp"]);
+            if (time()-$expiration < 0)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+
+        }
+        else
+        {
+            //no expiration, so it is considered insecure
+            return false;
+        }
+    }
 }//class nAuthJWT
